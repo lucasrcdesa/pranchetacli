@@ -5,31 +5,60 @@ import {
   Image,
   FlatList,
   TouchableOpacity,
-} from "react-native";
-import React from "react";
-import { CaretLeft } from "phosphor-react-native";
-import { useNavigation } from "@react-navigation/native";
-import { Jogadores } from "../ListaEstatistica";
+} from 'react-native';
+import React, {useEffect, useState} from 'react';
+import {CaretLeft} from 'phosphor-react-native';
+import {useNavigation, useRoute} from '@react-navigation/native';
+import firestore from '@react-native-firebase/firestore';
+import {Jogadores} from '../../../@types/jogadores';
 
 type Props = {};
 
 const TabelaEstatistica = (props: Props) => {
   const navigation = useNavigation();
-  const arrayJogadores: Jogadores[] = [
-    { name: "Lucas", gols: 2, assists: 3, cadastrado: true, vitorias: 8 },
-  ];
+  const route = useRoute();
+  const {id}: {id: string} = route.params;
+
+  const [jogadores, setJogadores] = useState<Jogadores[]>([]);
 
   const handleBack = () => {
-    navigation.goBack();
+    // navigation.goBack();
+    console.log(id);
   };
+  useEffect(() => {
+    const fetchPeladas = async () => {
+      try {
+        const peladas = await firestore()
+          .collection('jogadoresGlobal')
+          .doc(id)
+          .get();
+        const peladasData = peladas.data().jogadores as Jogadores[];
 
-  const renderList = ({ item }: { item: Jogadores }) => {
+        if (peladas) {
+          setJogadores(peladasData);
+        }
+      } catch (error) {
+        console.log(error);
+      }
+    };
+    fetchPeladas();
+  }, []);
+
+  const renderList = ({item}: {item: Jogadores}) => {
     return (
       <View style={styles.text}>
-        <Text>{item.name} </Text>
-        <Text>{item.gols}</Text>
-        <Text>{item.assists}</Text>
-        <Text>{item.vitorias}</Text>
+        <View style={styles.textBox}>
+          <Text>{item.name} </Text>
+        </View>
+        <View style={styles.textBox}>
+          <Text>{item.gols}</Text>
+        </View>
+        <View style={styles.textBox}>
+          <Text>{item.assists}</Text>
+        </View>
+        <View style={styles.textBox}>
+          <Text>{item.vitorias}</Text>
+        </View>
       </View>
     );
   };
@@ -41,15 +70,14 @@ const TabelaEstatistica = (props: Props) => {
           <TouchableOpacity
             onPress={() => {
               handleBack();
-            }}
-          >
+            }}>
             <CaretLeft color="white" />
           </TouchableOpacity>
         </View>
         <Image
           style={styles.img}
-          tintColor={"white"}
-          source={require("../../../assets/soccer.png")}
+          tintColor={'white'}
+          source={require('../../../assets/soccer.png')}
         />
         <View style={styles.addContainer}></View>
       </View>
@@ -63,10 +91,10 @@ const TabelaEstatistica = (props: Props) => {
           </View>
 
           <FlatList
-            data={arrayJogadores}
+            data={jogadores}
             renderItem={renderList}
             keyExtractor={(_, index) => index.toString()}
-            ItemSeparatorComponent={() => <View style={{ height: 5 }} />}
+            ItemSeparatorComponent={() => <View style={{height: 5}} />}
           />
         </View>
       </View>
@@ -79,20 +107,20 @@ export default TabelaEstatistica;
 const styles = StyleSheet.create({
   tela: {
     flex: 1,
-    backgroundColor: "#22300b",
+    backgroundColor: '#22300b',
   },
   headerContainer: {
-    width: "100%",
+    width: '100%',
     height: 200,
-    justifyContent: "space-around",
-    alignItems: "center",
-    flexDirection: "row",
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    flexDirection: 'row',
   },
   addContainer: {
     height: 35,
     width: 35,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
     borderRadius: 8,
   },
   //   width: 100%;
@@ -101,11 +129,11 @@ const styles = StyleSheet.create({
   // align-items: center;
   // flex-direction: row;
   backContainer: {
-    backgroundColor: "#344d0e",
+    backgroundColor: '#344d0e',
     height: 35,
     width: 35,
-    justifyContent: "center",
-    alignItems: "center",
+    justifyContent: 'center',
+    alignItems: 'center',
     borderRadius: 8,
   },
   img: {
@@ -114,34 +142,39 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    alignItems: "center",
+    alignItems: 'center',
   },
   listContainer: {
-    backgroundColor: "#344d0e",
-    width: "88%",
-    height: "80%",
+    backgroundColor: '#344d0e',
+    width: '88%',
+    height: '80%',
     borderRadius: 8,
     padding: 15,
   },
   tituloContainer: {
-    flexDirection: "row",
-    alignContent: "center",
-    justifyContent: "space-around",
+    flexDirection: 'row',
+    alignContent: 'center',
+    justifyContent: 'space-around',
     height: 25,
-    width: "98%",
-    backgroundColor: "#aa2834",
+    width: '98%',
+    backgroundColor: '#aa2834',
   },
   text: {
-    backgroundColor: "white",
+    backgroundColor: 'white',
     height: 25,
-    justifyContent: "space-around",
-    alignItems: "center",
-    flexDirection: "row",
-    width: "98%",
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    flexDirection: 'row',
+    width: '98%',
     borderWidth: 1,
   },
   textion: {
-    fontWeight: "bold",
-    color: "#E1E1E6",
+    fontWeight: 'bold',
+    color: '#E1E1E6',
+  },
+  textBox: {
+    width: '25%',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

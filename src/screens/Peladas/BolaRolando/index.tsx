@@ -7,28 +7,20 @@ import {
   TouchableOpacity,
   TextInput,
   Switch,
-} from "react-native";
-import React, { useEffect, useState } from "react";
-import { CaretLeft, ChartBar, Plus, Trash, X } from "phosphor-react-native";
-import { useNavigation, useRoute } from "@react-navigation/native";
-import { Jogadores } from "../CriarPelada";
-import styles from "./style";
+} from 'react-native';
+import React, {useEffect, useState} from 'react';
+import {CaretLeft, ChartBar, Plus, Trash, X} from 'phosphor-react-native';
+import {
+  useFocusEffect,
+  useNavigation,
+  useRoute,
+} from '@react-navigation/native';
+import styles from './style';
+import firestore from '@react-native-firebase/firestore';
+import {Jogadores} from '../../../@types/jogadores';
+import {Peladas} from '../../../@types/peladas';
 
 type Props = {};
-const array: string[] = [
-  "Lucas",
-  "Matheus",
-  "Dente",
-  "Rominho",
-  "Hudson",
-  "Madeira",
-  "Palito",
-  "Rubeça",
-  "Tavinho",
-  "Homo",
-  "Coto",
-  "Catra",
-];
 
 const BolaRolando = (props: Props) => {
   const navigation = useNavigation();
@@ -38,25 +30,13 @@ const BolaRolando = (props: Props) => {
   const [placar1, setPlacar1] = useState(0);
   const [placar2, setPlacar2] = useState(0);
 
-  const { jogadores }: { jogadores: Jogadores[] } = route.params;
-
-  const [time1, setTime1] = useState<Jogadores[]>([
-    jogadores[0],
-    jogadores[2],
-    jogadores[4],
-    jogadores[6],
-    jogadores[8],
-  ]);
-  const [time2, setTime2] = useState<Jogadores[]>([
-    jogadores[1],
-    jogadores[3],
-    jogadores[5],
-    jogadores[7],
-    jogadores[9],
-  ]);
-  const [time3, setTime3] = useState(jogadores.slice(10, 15));
-  const [time4, setTime4] = useState(jogadores.slice(15, 20));
-  const [sobra, setSobra] = useState(jogadores.slice(20));
+  const {pelada}: {pelada: Peladas} = route.params;
+  const [arrayFirebase, setArrayFirebase] = useState([]);
+  const [time1, setTime1] = useState<Jogadores[]>([]);
+  const [time2, setTime2] = useState<Jogadores[]>([]);
+  const [time3, setTime3] = useState([]);
+  const [time4, setTime4] = useState([]);
+  const [sobra, setSobra] = useState([]);
   const [jogadoresS, setJogadores] = useState([
     ...time1,
     ...time2,
@@ -64,76 +44,188 @@ const BolaRolando = (props: Props) => {
     ...time4,
     ...sobra,
   ]);
-  useEffect(() => {
-    setTime1(jogadoresS.slice(0, 5));
-    setTime2(jogadoresS.slice(5, 10));
-    setTime3(jogadoresS.slice(10, 15));
-    setTime4(jogadoresS.slice(15, 20));
-    setSobra(jogadores.slice(20));
-  }, [jogadoresS]);
+  useFocusEffect(
+    React.useCallback(() => {
+      const fetchPlacar = async () => {
+        try {
+          const time1Doc = await firestore()
+            .collection('Placar')
+            .doc('time1')
+            .get();
+          const time2Doc = await firestore()
+            .collection('Placar')
+            .doc('time2')
+            .get();
 
-  const [saiOsDois, setSaiOsDois] = useState(false);
-  const [regra, setRegra] = useState<null | string>("2");
-  const ganhouTime1 = () => {
-    const perdeu = jogadoresS.slice(5, 10);
-    jogadoresS.splice(5, 5);
-    return jogadoresS.concat(perdeu);
+          const updatedPlacar1 = (time1Doc.data()?.gols || 0) as number;
+          const updatedPlacar2 = (time2Doc.data()?.gols || 0) as number;
+
+          setPlacar1(updatedPlacar1);
+          setPlacar2(updatedPlacar2);
+        } catch (error) {
+          console.error('Erro ao buscar placares:', error);
+        }
+      };
+
+      fetchPlacar();
+    }, []),
+  );
+
+  useEffect(() => {
+    const fetchPelada = async () => {
+      try {
+        const peladas = await firestore()
+          .collection('JogadoresLocal')
+          .doc(`JogadoresLocal${pelada.id}`)
+          .get();
+
+        if (peladas.exists) {
+          const peladasData = peladas.data().jogadores as Jogadores[];
+          const newTime1 = [
+            peladasData[0],
+            peladasData[2],
+            peladasData[4],
+            peladasData[6],
+            peladasData[8],
+          ];
+          const newTime2 = [
+            peladasData[1],
+            peladasData[3],
+            peladasData[5],
+            peladasData[7],
+            peladasData[9],
+          ];
+          const newTime3 = peladasData.slice(10, 15);
+          const newTime4 = peladasData.slice(15, 20);
+          const newSobra = peladasData.slice(20);
+          setTime1(newTime1);
+          setTime2(newTime2);
+          setTime3(newTime3);
+          setTime4(newTime4);
+          setSobra(newSobra);
+          const arrayUpdated = [
+            ...newTime1,
+            ...newTime2,
+            ...newTime3,
+            ...newTime4,
+            ...newSobra,
+          ];
+          setArrayFirebase(arrayUpdated);
+          firestore()
+            .collection('JogadoresLocal')
+            .doc(`JogadoresLocal${pelada.id}`)
+            .set({jogadores: arrayUpdated});
+        }
+      } catch (error) {
+        console.log(error);
+      }
+    };
+    fetchPelada();
+  }, [pelada.id]);
+
+  const [saiOsDois, setSaiOsDois] = useState(true);
+  const [regra, setRegra] = useState<null | string>('2');
+
+  const updateArrayFirebase = async (updatedArray: Jogadores[]) => {
+    try {
+      await firestore()
+        .collection('JogadoresLocal')
+        .doc(`JogadoresLocal${pelada.id}`)
+        .set({jogadores: updatedArray});
+      setArrayFirebase(updatedArray);
+      setJogadores(updatedArray);
+    } catch (error) {
+      console.error('Erro ao atualizar arrayFirebase:', error);
+    }
   };
-  const ganhouTime2 = () => {
-    const perdeu = jogadoresS.slice(0, 5);
-    jogadoresS.splice(0, 5);
-    return jogadoresS.concat(perdeu);
+  const ganhouTime1 = async () => {
+    const perdeu = arrayFirebase.slice(5, 10);
+    const newArray = arrayFirebase.filter(
+      (_, index) => index < 5 || index >= 10,
+    );
+    const updatedArray = [...newArray, ...perdeu];
+    updateArrayFirebase(updatedArray);
   };
-  const empatou = () => {
+  const ganhouTime2 = async () => {
+    const perdeu = arrayFirebase.slice(0, 5);
+    const newArray = arrayFirebase.slice(5);
+    const updatedArray = [...newArray, ...perdeu];
+    updateArrayFirebase(updatedArray);
+    console.log(updatedArray);
+  };
+  const empatou = async () => {
     let updatedJogadores;
 
-    if (!saiOsDois) {
-      if (regra === "1") {
+    if (saiOsDois) {
+      if (regra === '1') {
         updatedJogadores = ganhouTime1();
-      } else if (regra === "2") {
+      } else if (regra === '2') {
         updatedJogadores = ganhouTime2();
       }
     } else {
-      const perdeu = jogadoresS.slice(0, 10);
-      updatedJogadores = [...jogadoresS.slice(10), ...perdeu];
-    }
-
-    if (updatedJogadores) {
-      setJogadores(updatedJogadores);
+      const perdeu = arrayFirebase.slice(0, 10);
+      updatedJogadores = [...arrayFirebase.slice(10), ...perdeu];
+      updateArrayFirebase(updatedJogadores);
     }
   };
 
-  const handleNavigationRolando = () => {
+  const handleNavigationRolando = async () => {
+    let updatedArray = [...arrayFirebase];
+
     if (placar1 > placar2) {
-      setJogadores(ganhouTime1());
-      console.log(jogadoresS);
+      await ganhouTime1();
+    } else if (placar1 < placar2) {
+      await ganhouTime2();
+    } else if (placar1 === placar2) {
+      await empatou();
     }
-    if (placar1 < placar2) {
-      setJogadores(ganhouTime2());
-    }
-    if (placar1 == placar2) {
-      empatou();
-    }
+
+    // Reconstrói os times com base no novo array
+    const newTime1 = updatedArray.slice(0, 5);
+    const newTime2 = updatedArray.slice(5, 10);
+    const newTime3 = updatedArray.slice(10, 15);
+    const newTime4 = updatedArray.slice(15, 20);
+
+    // Atualiza os estados para refletir as mudanças
+    setTime1(newTime1);
+    setTime2(newTime2);
+    setTime3(newTime3);
+    setTime4(newTime4);
   };
+
   const handleClickDescansar = (index: number) => {
     const updatedJogadores = [...jogadoresS];
 
     const descansou = updatedJogadores.splice(index, 1)[0];
     updatedJogadores.push(descansou);
-
-    setJogadores(updatedJogadores);
   };
+  // setJogadores(updatedJogadores);
 
   const handleNavigationStart = () =>
-    navigation.navigate("TabelaRolando", { jogadores: jogadores });
+    navigation.navigate('TabelaRolando', {pelada: pelada});
   const handleNavigationGol1 = () =>
-    navigation.navigate("TelaGol", { time: time1, fez: 1 });
+    navigation.navigate('TelaGol', {
+      time: time1,
+      fez: 1,
+      id: pelada.id,
+      pelada: pelada,
+    });
+  // console.log(arrayFirebase);
   const handleNavigationGol2 = () =>
-    navigation.navigate("TelaGol", { time: time2, fez: 2 });
+    navigation.navigate('TelaGol', {
+      time: time2,
+      fez: 2,
+      id: pelada.id,
+      pelada: pelada,
+    });
   const handleBack = () => {
-    navigation.goBack();
+    // navigation.goBack();
+    console.log(time1);
   };
-  const renderLista = ({ item, index }: { item: Jogadores; index: number }) => {
+  const renderLista = ({item, index}: {item: Jogadores; index: number}) => {
+    if (!item || !item.name) {
+      return;
+    }
     return (
       <View style={styles.touchable}>
         <Text style={styles.textList}>{item.name}</Text>
@@ -151,15 +243,14 @@ const BolaRolando = (props: Props) => {
           <TouchableOpacity
             onPress={() => {
               handleBack();
-            }}
-          >
+            }}>
             <CaretLeft color="white" />
           </TouchableOpacity>
         </View>
         <Image
           style={styles.img}
-          tintColor={"white"}
-          source={require("../../../assets/soccer.png")}
+          tintColor={'white'}
+          source={require('../../../assets/soccer.png')}
         />
         <View style={styles.addContainer}>
           <TouchableOpacity onPress={handleNavigationStart}>
@@ -184,17 +275,17 @@ const BolaRolando = (props: Props) => {
       <View style={styles.jogoContainer}>
         <View style={styles.times}>
           <View style={styles.listContainer}>
-            {array.length === 0 ? (
+            {arrayFirebase.length === 0 ? (
               <Text style={styles.emptyMessage}>
                 Não há peladas adicionadas ainda
               </Text>
             ) : (
               <FlatList
                 style={styles.list}
-                data={time1}
+                data={time1 || []}
                 renderItem={renderLista}
                 keyExtractor={(_, index) => index.toString()}
-                ItemSeparatorComponent={() => <View style={{ height: 5 }} />}
+                ItemSeparatorComponent={() => <View style={{height: 5}} />}
               />
             )}
           </View>
@@ -204,17 +295,17 @@ const BolaRolando = (props: Props) => {
         </View>
         <View style={styles.times}>
           <View style={styles.listContainer}>
-            {array.length === 0 ? (
+            {arrayFirebase.length === 0 ? (
               <Text style={styles.emptyMessage}>
                 Não há peladas adicionadas ainda
               </Text>
             ) : (
               <FlatList
                 style={styles.list}
-                data={time2}
+                data={time2 || []}
                 renderItem={renderLista}
                 keyExtractor={(_, index) => index.toString()}
-                ItemSeparatorComponent={() => <View style={{ height: 5 }} />}
+                ItemSeparatorComponent={() => <View style={{height: 5}} />}
               />
             )}
           </View>
@@ -235,34 +326,34 @@ const BolaRolando = (props: Props) => {
         <View style={styles.proxContainer}>
           <View style={styles.prox}>
             <View style={styles.listContainer}>
-              {array.length === 0 ? (
+              {arrayFirebase.length === 0 ? (
                 <Text style={styles.emptyMessage}>
                   Não há peladas adicionadas ainda
                 </Text>
               ) : (
                 <FlatList
                   style={styles.list}
-                  data={time3}
+                  data={time3 || []}
                   renderItem={renderLista}
                   keyExtractor={(_, index) => index.toString()}
-                  ItemSeparatorComponent={() => <View style={{ height: 5 }} />}
+                  ItemSeparatorComponent={() => <View style={{height: 5}} />}
                 />
               )}
             </View>
           </View>
           <View style={styles.prox}>
             <View style={styles.listContainer}>
-              {array.length === 0 ? (
+              {arrayFirebase.length === 0 ? (
                 <Text style={styles.emptyMessage}>
                   Não há peladas adicionadas ainda
                 </Text>
               ) : (
                 <FlatList
                   style={styles.list}
-                  data={time4}
+                  data={time4 || []}
                   renderItem={renderLista}
                   keyExtractor={(_, index) => index.toString()}
-                  ItemSeparatorComponent={() => <View style={{ height: 5 }} />}
+                  ItemSeparatorComponent={() => <View style={{height: 5}} />}
                 />
               )}
             </View>
@@ -273,14 +364,16 @@ const BolaRolando = (props: Props) => {
       <View style={styles.botaoContainer}>
         <TouchableOpacity
           style={styles.botao}
-          onPress={handleNavigationRolando}
-        >
+          onPress={handleNavigationRolando}>
           <Text style={styles.textBotao}>Encerrar partida</Text>
         </TouchableOpacity>
         <View style={styles.swit}>
           <Switch
-            trackColor={{ false: "#aa2834", true: "#344d0e" }}
-            onValueChange={(value) => setSaiOsDois(value)}
+            trackColor={{false: '#aa2834', true: 'black'}}
+            onValueChange={value => {
+              console.log(`Switch value changed:', ${value}`);
+              setSaiOsDois(value);
+            }}
             value={saiOsDois}
           />
           <Text style={styles.switText}> Empate sai os dois</Text>

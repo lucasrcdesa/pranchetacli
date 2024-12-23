@@ -3,4 +3,5 @@ export interface Peladas {
   quantos: number;
   contra: boolean;
   regra: string;
+  id: string;
 }
