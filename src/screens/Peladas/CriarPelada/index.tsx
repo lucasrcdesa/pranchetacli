@@ -8,7 +8,7 @@ import {
   Alert,
 } from 'react-native';
 import React, {useState, useRef, useEffect} from 'react';
-import {CaretLeft, Plus, Trash} from 'phosphor-react-native';
+import {CaretLeft, DotsThree, Plus, Trash} from 'phosphor-react-native';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import styles from './style';
 import {Jogadores} from '../../../@types/jogadores';
@@ -128,10 +128,17 @@ const CriarPelada = (props: Props) => {
   const renderLista = ({item, index}: {item: Jogadores; index: number}) => {
     return (
       <View style={styles.touchable}>
-        <Text style={styles.textList}>{item.name}</Text>
-        <TouchableOpacity onPress={() => handleDeletePlayer(index)}>
-          <Trash />
-        </TouchableOpacity>
+        <View>
+          <Text style={styles.textList}>{item.name}</Text>
+        </View>
+        <View style={styles.divDot}>
+          <TouchableOpacity>
+            <DotsThree />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => handleDeletePlayer(index)}>
+            <Trash />
+          </TouchableOpacity>
+        </View>
       </View>
     );
   };

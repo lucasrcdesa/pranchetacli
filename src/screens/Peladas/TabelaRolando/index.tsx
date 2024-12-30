@@ -26,7 +26,7 @@ const TabelaRolando = (props: Props) => {
   const handleBack = () => {
     navigation.goBack();
   };
-
+  console.log(arrayFirebase);
   const handleNavigationRolando = () => {
     const fetchPelada = async () => {
       try {

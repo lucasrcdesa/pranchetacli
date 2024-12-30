@@ -31,19 +31,13 @@ const BolaRolando = (props: Props) => {
   const [placar2, setPlacar2] = useState(0);
 
   const {pelada}: {pelada: Peladas} = route.params;
-  const [arrayFirebase, setArrayFirebase] = useState([]);
+  const [arrayFirebase, setArrayFirebase] = useState<Jogadores[]>([]);
   const [time1, setTime1] = useState<Jogadores[]>([]);
   const [time2, setTime2] = useState<Jogadores[]>([]);
   const [time3, setTime3] = useState([]);
   const [time4, setTime4] = useState([]);
   const [sobra, setSobra] = useState([]);
-  const [jogadoresS, setJogadores] = useState([
-    ...time1,
-    ...time2,
-    ...time3,
-    ...time4,
-    ...sobra,
-  ]);
+
   useFocusEffect(
     React.useCallback(() => {
       const fetchPlacar = async () => {
@@ -125,33 +119,63 @@ const BolaRolando = (props: Props) => {
 
   const [saiOsDois, setSaiOsDois] = useState(true);
   const [regra, setRegra] = useState<null | string>('2');
-
   const updateArrayFirebase = async (updatedArray: Jogadores[]) => {
     try {
+      // Buscar os dados existentes no Firestore
+      const doc = await firestore()
+        .collection('JogadoresLocal')
+        .doc(`JogadoresLocal${pelada.id}`)
+        .get();
+
+      const existingJogadores = doc.data()?.jogadores || [];
+
+      // Mesclar os dados para preservar gols, assists e outras propriedades
+      const mergedArray = updatedArray.map(jogador => {
+        const existingJogador = existingJogadores.find(
+          j => j.name === jogador.name,
+        );
+        return {
+          ...jogador,
+          gols: existingJogador?.gols || jogador.gols || 0,
+          assists: existingJogador?.assists || jogador.assists || 0,
+          vitorias: existingJogador?.vitorias || jogador.vitorias || 0,
+        };
+      });
+
+      // Atualizar no Firestore
       await firestore()
         .collection('JogadoresLocal')
         .doc(`JogadoresLocal${pelada.id}`)
-        .set({jogadores: updatedArray});
-      setArrayFirebase(updatedArray);
-      setJogadores(updatedArray);
+        .set({jogadores: mergedArray});
+
+      // Atualizar o estado local
+      setArrayFirebase(mergedArray);
     } catch (error) {
       console.error('Erro ao atualizar arrayFirebase:', error);
     }
   };
+
   const ganhouTime1 = async () => {
-    const perdeu = arrayFirebase.slice(5, 10);
-    const newArray = arrayFirebase.filter(
-      (_, index) => index < 5 || index >= 10,
-    );
-    const updatedArray = [...newArray, ...perdeu];
-    updateArrayFirebase(updatedArray);
+    try {
+      const perdeu = arrayFirebase.slice(5, 10);
+      const newArray = [
+        ...arrayFirebase.slice(0, 5),
+        ...arrayFirebase.slice(10),
+      ];
+      const updatedArray = [...newArray, ...perdeu];
+
+      await updateArrayFirebase(updatedArray);
+      setArrayFirebase(updatedArray);
+    } catch (error) {
+      console.error('Erro no ganhouTime1:', error);
+    }
   };
   const ganhouTime2 = async () => {
     const perdeu = arrayFirebase.slice(0, 5);
     const newArray = arrayFirebase.slice(5);
     const updatedArray = [...newArray, ...perdeu];
-    updateArrayFirebase(updatedArray);
-    console.log(updatedArray);
+    await updateArrayFirebase(updatedArray);
+    await setArrayFirebase(updatedArray);
   };
   const empatou = async () => {
     let updatedJogadores;
@@ -165,40 +189,103 @@ const BolaRolando = (props: Props) => {
     } else {
       const perdeu = arrayFirebase.slice(0, 10);
       updatedJogadores = [...arrayFirebase.slice(10), ...perdeu];
-      updateArrayFirebase(updatedJogadores);
+      await updateArrayFirebase(updatedJogadores);
+      await setArrayFirebase(updatedJogadores);
     }
   };
 
   const handleNavigationRolando = async () => {
-    let updatedArray = [...arrayFirebase];
+    try {
+      // Decide o resultado da partida e atualiza o array no Firebase
+      if (placar1 > placar2) {
+        await ganhouTime1();
+      } else if (placar1 < placar2) {
+        await ganhouTime2();
+      } else {
+        await empatou();
+      }
 
-    if (placar1 > placar2) {
-      await ganhouTime1();
-    } else if (placar1 < placar2) {
-      await ganhouTime2();
-    } else if (placar1 === placar2) {
-      await empatou();
+      // Recupera o array atualizado do Firebase
+      const updatedArray: Jogadores[] = await firestore()
+        .collection('JogadoresLocal')
+        .doc(`JogadoresLocal${pelada.id}`)
+        .get()
+        .then(doc => doc.data()?.jogadores || []);
+
+      // Preserva os gols e assistências do estado atual ao reorganizar os times
+      const normalizedArray = updatedArray.map(jogador => {
+        const existing = arrayFirebase.find(j => j.id === jogador.id);
+        return {
+          ...jogador,
+          gols: existing?.gols || jogador.gols || 0,
+          assists: existing?.assists || jogador.assists || 0,
+        };
+      });
+
+      // Atualiza o Firestore com o array normalizado
+      await firestore()
+        .collection('JogadoresLocal')
+        .doc(`JogadoresLocal${pelada.id}`)
+        .set({jogadores: normalizedArray});
+
+      setArrayFirebase(normalizedArray);
+
+      // Atualiza os times com base no novo array
+      const newTime1 = normalizedArray.slice(0, 5);
+      const newTime2 = normalizedArray.slice(5, 10);
+      const newTime3 = normalizedArray.slice(10, 15);
+      const newTime4 = normalizedArray.slice(15, 20);
+
+      setTime1(newTime1);
+      setTime2(newTime2);
+      setTime3(newTime3);
+      setTime4(newTime4);
+
+      // Reseta o placar no Firebase
+      await firestore().collection('Placar').doc('time1').set({gols: 0});
+      await firestore().collection('Placar').doc('time2').set({gols: 0});
+      setPlacar1(0);
+      setPlacar2(0);
+
+      console.log('Partida encerrada com sucesso.');
+    } catch (error) {
+      console.error('Erro ao encerrar a partida:', error);
     }
-
-    // Reconstrói os times com base no novo array
-    const newTime1 = updatedArray.slice(0, 5);
-    const newTime2 = updatedArray.slice(5, 10);
-    const newTime3 = updatedArray.slice(10, 15);
-    const newTime4 = updatedArray.slice(15, 20);
-
-    // Atualiza os estados para refletir as mudanças
-    setTime1(newTime1);
-    setTime2(newTime2);
-    setTime3(newTime3);
-    setTime4(newTime4);
   };
 
-  const handleClickDescansar = (index: number) => {
-    const updatedJogadores = [...jogadoresS];
+  const handleClickDescansar = async (index: number) => {
+    try {
+      // Criar uma cópia do array de jogadores
+      const updatedJogadores = [...arrayFirebase];
 
-    const descansou = updatedJogadores.splice(index, 1)[0];
-    updatedJogadores.push(descansou);
+      // Remover o jogador selecionado e adicioná-lo no final do array
+      const descansou = updatedJogadores.splice(index, 1)[0];
+      updatedJogadores.push(descansou);
+
+      // Atualizar o Firestore com a nova lista de jogadores
+      await updateArrayFirebase(updatedJogadores);
+
+      // Atualizar o estado local com a nova lista de jogadores
+      setArrayFirebase(updatedJogadores);
+
+      // Atualizar os times com base no novo array
+      const newTime1 = updatedJogadores.slice(0, 5);
+      const newTime2 = updatedJogadores.slice(5, 10);
+      const newTime3 = updatedJogadores.slice(10, 15);
+      const newTime4 = updatedJogadores.slice(15, 20);
+      const newSobra = updatedJogadores.slice(20);
+
+      // Atualizar os estados dos times
+      setTime1(newTime1);
+      setTime2(newTime2);
+      setTime3(newTime3);
+      setTime4(newTime4);
+      setSobra(newSobra);
+    } catch (error) {
+      console.error('Erro ao atualizar jogadores no Firestore:', error);
+    }
   };
+
   // setJogadores(updatedJogadores);
 
   const handleNavigationStart = () =>
@@ -219,8 +306,7 @@ const BolaRolando = (props: Props) => {
       pelada: pelada,
     });
   const handleBack = () => {
-    // navigation.goBack();
-    console.log(time1);
+    navigation.goBack();
   };
   const renderLista = ({item, index}: {item: Jogadores; index: number}) => {
     if (!item || !item.name) {

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useRef} from 'react';
 import {
   Image,
   View,
@@ -19,6 +19,7 @@ type Props = {};
 const Home = (props: Props) => {
   const navigation = useNavigation();
   const [pelada, setPelada] = useState(null);
+  const ref = useRef(null);
 
   useEffect(() => {
     const fetchPeladas = async () => {
@@ -44,10 +45,10 @@ const Home = (props: Props) => {
   const handleNavigatePeladas = () => {
     navigation.navigate('MinhasPeladas');
   };
-
+  console.log('### REF', ref);
   return (
     <ImageBackground source={backGround} style={styles.container}>
-      <View style={styles.logoContainer}>
+      <View style={styles.logoContainer} ref={ref}>
         <Image
           style={styles.logo}
           tintColor={'white'}

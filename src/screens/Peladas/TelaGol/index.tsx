@@ -63,7 +63,6 @@ const TelaGol = (props: Props) => {
       if (fez === 1) {
         const golsJog = docData[golselecionado].gols;
         const assistJog = docData[assistSelecionada].assists;
-        console.log(timeFez);
         docData[golselecionado] = {
           ...docData[golselecionado],
           gols: golsJog + 1,
@@ -77,7 +76,6 @@ const TelaGol = (props: Props) => {
       } else if (fez === 2) {
         const assistJog = docData[assistSelecionada + 5].assists;
         const golsJog = docData[golselecionado + 5].gols;
-        console.log(timeFez);
         docData[golselecionado + 5] = {
           ...docData[golselecionado + 5],
           gols: golsJog + 1,
